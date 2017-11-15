@@ -32,6 +32,7 @@ template <bf_data_t... OData> struct Output {};
 template <bool DoFail> struct FailInput { static_assert(!DoFail, "missing input when executing ,"); };
 template <bool DoFail> struct FailInternalError { static_assert(!DoFail, "internal erorr on execution"); };
 template <bool DoFail> struct FailMissingEnclosingBracket { static_assert(!DoFail, "missing enclosing bracket"); };
+template <bool DoFail> struct FailMissingOpeningBracket { static_assert(!DoFail, "missing opening bracket"); };
 
 template < typename CodeStack, bf_command_t C, typename TheTapeLeft, typename TheTapeRight, typename TheInput, typename TheOutput > struct Program
 {
@@ -72,11 +73,11 @@ template < bf_command_t... CL, bf_command_t... CRTail > struct NextCodeStack< Co
 };
 
 template < class CodeStack, int NumBrackets > struct ScanForward;
-// required? don't think so since we have ']',1 => finished
-template < class CodeStack > struct ScanForward< CodeStack, 0 >
+template < class CodeLeft, int TheNumBrackets > struct ScanForward< CodeStack< CodeLeft, Code<> >, TheNumBrackets >
 {
-  using result = CodeStack;
+  using result = FailMissingEnclosingBracket<true>;
 };
+
 template < bf_command_t... CL, bf_command_t CRHead, bf_command_t... CRTail, int TheNumBrackets > struct ScanForward < CodeStack< Code<CL...>, Code<CRHead, CRTail...> >, TheNumBrackets >
 {
   using result = typename ScanForward< CodeStack< Code< CRHead, CL... >, Code< CRTail... > >, TheNumBrackets >::result;
@@ -105,17 +106,15 @@ template < bf_command_t... CL, bf_command_t... CRTail > struct NextCodeStack< Co
 
 template < bf_command_t... CL, bf_command_t... CRTail > struct NextCodeStack< CodeStack< Code< CL... >, Code< ']', CRTail... > >, false  >
 {
-  using fail = FailInternalError<true>;
   using next_code_stack = NextCodeStack< CodeStack< Code< ']', CL... >, Code< CRTail... > >, false >;
   static const bf_command_t command = next_code_stack::command;
   using stack = typename next_code_stack::stack;
 };
 
 template < class CodeStack, int NumBrackets > struct ScanBackward;
-// required? don't think so since we have ']',1 => finished
-template < class CodeStack > struct ScanBackward< CodeStack, 0 >
+template < class CodeRight, int TheNumBrackets > struct ScanBackward< CodeStack< Code<>, CodeRight >, TheNumBrackets >
 {
-  using result = CodeStack;
+  using result = FailMissingOpeningBracket<true>;
 };
 template < bf_command_t CLHead, bf_command_t... CLTail, bf_command_t... CR, int TheNumBrackets > struct ScanBackward < CodeStack< Code<CLHead, CLTail...>, Code<CR...> >, TheNumBrackets >
 {
@@ -246,7 +245,7 @@ int main()
   }
 
   {
-    using the_code = Code<'+', '+', '+', '[', '-', '.', ']', '+', '+', '.'>;
+    using the_code = Code<'+', '+', '[', '-', '.', ']', '+', '+', '-', '.', '+', '+', '.'>;
     using the_input = Input<'X'>;
     using the_tape_left = TapeLeft<>;
     using the_tape_right = TapeRight<>;
